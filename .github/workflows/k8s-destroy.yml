@@ -1,0 +1,36 @@
+# .github/workflows/k8s-destroy.yml
+
+name: k8s Destroy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  destroy:
+    permissions:
+      contents: read # for actions/checkout to fetch code
+      security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
+    runs-on: ubuntu-latest
+    env:
+      AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Uninstall Prometheus and Grafana
+        run: |
+          aws eks --region ${{ secrets.AWS_REGION }} update-kubeconfig --name ${{ secrets.CLUSTER_NAME }}
+          helm uninstall prometheus -n monitoring || true
+          helm uninstall grafana -n monitoring || true
+          kubectl delete ns monitoring || true
+    
+      - name: Destroy AWS EKS Deployments
+        run: |
+          aws eks --region ${{ secrets.AWS_REGION }} update-kubeconfig --name ${{ secrets.CLUSTER_NAME }}
+          kubectl delete -f frontend_deployment.yaml || true
+          kubectl delete -f backend.yaml || true
+          kubectl delete -f database.yaml || true
+          kubectl delete -f secret.yaml || true
+          kubectl delete -f service.yaml || true
